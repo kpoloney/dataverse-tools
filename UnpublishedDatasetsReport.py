@@ -15,7 +15,7 @@ token = input("Enter API key: ")
 search_api = "https://borealisdata.ca/api/search"
 params = {"q": "*",
           "subtree": "ualberta",
-          "fq": "publicationStatus:Draft",
+          "fq": "publicationStatus:Unpublished",
           "type": "dataset",
           "per_page": "1000"}
 
