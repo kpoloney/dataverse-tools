@@ -90,6 +90,8 @@ ds_w_file_desc = 0
 ds_w_restricted = 0
 total_restricted = 0
 ds_readme = 0
+file_type = []
+documentation_tag = 0
 
 for dataset in metadata_all:
     if 'license' in dataset['datasetVersion'].keys():
@@ -107,6 +109,7 @@ for dataset in metadata_all:
     file_desc = 0
     files_restricted = 0
     files_readme = 0
+    files_documentation = 0
     for file in files:
         if 'description' in file.keys():
             file_desc += 1
@@ -114,10 +117,21 @@ for dataset in metadata_all:
             files_restricted += 1
         if re.search('readme|read_me|read\sme', file['label'], re.IGNORECASE):
             files_readme += 1
+        if 'friendlyType' in file['dataFile'].keys():
+            if file['dataFile']['friendlyType'] == 'Unknown':
+                file_type.append(file['dataFile']['contentType'])
+            else:
+                file_type.append(file['dataFile']['friendlyType'])
+        if 'categories' in file.keys():
+            for tag in file['categories']:
+                if tag == 'Documentation':
+                    files_documentation += 1
     if file_desc > 0:
         ds_w_file_desc += 1
     if files_restricted > 0:
         ds_w_restricted += 1
     if files_readme > 0:
         ds_readme += 1
+    if files_documentation > 0:
+        documentation_tag += 1
     total_restricted = total_restricted + files_restricted
