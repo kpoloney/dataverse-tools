@@ -1,5 +1,6 @@
 import requests
 import os
+import re
 
 api = "https://borealisdata.ca/api/"
 
@@ -18,8 +19,9 @@ subj = r_subject.content
 with open(os.path.join("reports", "Subject.csv"), "wb") as c:
     c.write(subj)
 
-# Get datasets that have related citation
-# First get list of dataset ids to check
+# Metrics using Native API (citation metadata, file metadata, etc)
+# First get list of datasets to check. Since our dataverse has so many nested dataverses and the Native API endpoint
+# for listing contents of a dataverse is not recursive, I am using the search API to start.
 search = api + "search"
 s_params = {"q": "*",
             "subtree": "ualberta",
@@ -28,11 +30,11 @@ s_params = {"q": "*",
 r = requests.get(search, params=s_params)
 results = r.json()
 
-# Total count should be equal to total number of datasets
+# Total count should be equal to total number of datasets (you can verify this from the user interface)
 print("Total datasets: " + str(results['data']['total_count']))
 
-# This is a list of the JSON metadata for each dataset. Unfortunately it uses a different format than the other APIs so
-# we need to do some fanangling to get the actual dataset_id value for each.
+# This is a list of the JSON search metadata for each dataset. It doesn't include everything we need, so use the
+# DOIs from this to get the full metadata using the Native API.
 search_metadata = results['data']['items']
 
 # Number with related publication (we can check this with just the search metadata).
@@ -52,7 +54,7 @@ for dataset in search_metadata:
     md_single = export_single_md.json()
     metadata_all.append(md_single)
 
-# Counters for citation metadata metrics
+# Counters for citation metadata metrics (related materials, ORCID use, author affiliation)
 n_rel_mat = 0
 n_orcid = 0
 auth_affil = []
@@ -81,7 +83,41 @@ for md in metadata_all:
     if n_orcid_total > 0:
         n_orcid += 1
 
-# Get list of files: https://borealisdata.ca/api/datasets/[dataset_id]/versions/:latest-published/files
-# Get file metadata: https://borealisdata.ca/api/files/760529/metadata
-# :persistentId/ /api/datasets/:persistentId/?persistentId=$PERSISTENT_IDENTIFIER
-# Just citation md: export = api + "/datasets/:persistentId/versions/:latest-published/metadata/citation"
+# Counters/lists for file metrics and licenses
+licenses = []
+n_files = []
+ds_w_file_desc = 0
+ds_w_restricted = 0
+total_restricted = 0
+ds_readme = 0
+
+for dataset in metadata_all:
+    if 'license' in dataset['datasetVersion'].keys():
+        license_name = dataset['datasetVersion']['license']['name']
+    elif 'termsOfUse' in dataset['datasetVersion'].keys():
+        if 'CC0 Waiver' in dataset['datasetVersion']['termsOfUse']:
+            license_name = 'CC0 Waiver'
+        else:
+            license_name = 'Custom'
+    licenses.append(license_name)
+    # Get files list
+    files = dataset['datasetVersion']['files']
+    n_files.append(len(files))
+    # Check file metadata
+    file_desc = 0
+    files_restricted = 0
+    files_readme = 0
+    for file in files:
+        if 'description' in file.keys():
+            file_desc += 1
+        if file['restricted']:
+            files_restricted += 1
+        if re.search('readme|read_me|read\sme', file['label'], re.IGNORECASE):
+            files_readme += 1
+    if file_desc > 0:
+        ds_w_file_desc += 1
+    if files_restricted > 0:
+        ds_w_restricted += 1
+    if files_readme > 0:
+        ds_readme += 1
+    total_restricted = total_restricted + files_restricted
