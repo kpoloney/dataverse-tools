@@ -7,7 +7,7 @@ import requests
 
 logging.basicConfig(filename="UnpublishedSearch.log", level=logging.INFO)
 
-# Use Dataverse's Search API to retrieve a report of datasets with the "Draft" status.
+# Use Dataverse's Search API to retrieve a report of datasets with the "unpublished" status.
 # Parse the JSON response to filter only for those uploaded over six months ago.
 # Write results to csv file.
 
@@ -58,7 +58,7 @@ if r.status_code == 200:
             except UnicodeEncodeError:
                 utfline = {}
                 for k, v in newline.items():
-                    if type(v) == str:
+                    if isinstance(v, str):
                         utfline[k] = v.encode('utf-8')
                 writer.writerow(utfline)
             else:
