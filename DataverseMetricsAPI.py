@@ -1,6 +1,8 @@
-import requests
 import os
 import re
+import csv
+import requests
+from collections import Counter
 
 api = "https://borealisdata.ca/api/"
 
@@ -36,6 +38,9 @@ print("Total datasets: " + str(results['data']['total_count']))
 # This is a list of the JSON search metadata for each dataset. It doesn't include everything we need, so use the
 # DOIs from this to get the full metadata using the Native API.
 search_metadata = results['data']['items']
+
+# Get counts by dataverse
+dvcount = dict(Counter(d['identifier_of_dataverse'] for d in search_metadata))
 
 # Number with related publication (we can check this with just the search metadata).
 n_rel_pub = 0
@@ -135,3 +140,58 @@ for dataset in metadata_all:
     if files_documentation > 0:
         documentation_tag += 1
     total_restricted = total_restricted + files_restricted
+
+# Storage size - total and by dataverse
+storage_size = 0
+dataset_sizes = []
+
+for dataset in metadata_all:
+    files = dataset['datasetVersion']['files']
+    doi = dataset['persistentUrl']
+    for result in search_metadata:
+        if result['url'] == doi:
+            dv_name = result['identifier_of_dataverse']
+            break
+    try:
+        dv_name
+    except NameError:
+        dv_name = ''
+    ds_size = 0
+    for file in files:
+        ds_size += file['dataFile']['filesize']
+        storage_size += file['dataFile']['filesize']
+    dataset_sizes.append({'parent_dv': dv_name, 'dataset_size': ds_size})
+with open(os.path.join('reports', 'storage_size.csv'), 'w') as c:
+    writer = csv.DictWriter(c, fieldnames=['parent_dv', 'dataset_size'])
+    writer.writeheader()
+    for line in dataset_sizes:
+        writer.writerow(line)
+
+# Unpublished datasets
+token = input("Enter API key: ")
+params = {"q": "*",
+          "subtree": "ualberta",
+          "fq": "publicationStatus:Unpublished",
+          "type": "dataset",
+          "per_page": "1000"}
+u = requests.get(search, params=params, headers={"X-Dataverse-key": token})
+unpubs = u.json()['data']['items']
+
+with open(os.path.join('reports', 'Unpublished.csv'), 'w') as c:
+    writer = csv.DictWriter(c, fieldnames=['dataverse', 'doi', 'date_created', 'file_count'])
+    writer.writeheader()
+    for line in unpubs:
+        newline = {'dataverse': line['identifier_of_dataverse'],
+                   'doi': line['url'],
+                   'date_created': line['createdAt'],
+                   'file_count': line['fileCount']}
+        try:
+            writer.writerow(newline)
+        except UnicodeEncodeError:
+            utfline = {}
+            for k, v in newline.items():
+                if isinstance(v, str):
+                    utfline[k] = v.encode('utf-8')
+            writer.writerow(utfline)
+        else:
+            continue
