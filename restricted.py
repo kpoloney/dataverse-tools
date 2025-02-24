@@ -35,13 +35,13 @@ restricted_datasets = []
 for ds in metadata_all:
     filelist = ds['datasetVersion']['files']
     n_restr = 0
+    downloads = 0
     for file in filelist:
         if not file['restricted']:
             continue
         else:
             n_restr += 1
             #Lookup file id in download count list - get total downloads of restricted files for this dataset
-            downloads = 0
             file_id = file['dataFile']['id']
             for item in dls:
                 if item['id'] == file_id:
